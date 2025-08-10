@@ -1,0 +1,441 @@
+<!doctype html><html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>スマホ用ファミリーツリー</title>
+<style>
+:root{
+  --bg:#0E1117; --card:#161B22; --ink:#E6EDF3; --muted:#9BA5B4;
+  --line:#2D333B; --accent:#8A7CFB; --accent2:#35A7FF; --danger:#ff6b6b;
+  --wire:#3f4b5c;
+}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",sans-serif}
+header{position:sticky;top:0;z-index:30;background:linear-gradient(90deg,#141821,#141b25);border-bottom:1px solid var(--line);padding:10px 14px}
+header h1{font-size:16px;margin:0 0 6px}
+header .sub{font-size:12px;color:var(--muted)}
+.wrap{display:flex;flex-direction:column;gap:12px;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.tabs{display:flex;gap:8px}
+.tab{flex:1;text-align:center;padding:10px;border-radius:10px;background:#0C1016;border:1px solid #2c3440;color:#c7d0e5;font-weight:700}
+.tab.active{background:var(--accent);color:#fff;border-color:transparent}
+.btn{appearance:none;border:none;border-radius:10px;padding:12px 14px;color:#fff;background:var(--accent);font-weight:700;font-size:16px}
+.btn.alt{background:var(--accent2)} .btn.ghost{background:transparent;border:1px solid #39414f;color:#c7d0e5}
+.btn.danger{background:var(--danger)}
+.row{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+label{font-size:12px;color:var(--muted)}
+input,select,textarea{width:100%;padding:12px 10px;border-radius:10px;border:1px solid #2c3440;background:#0C1016;color:var(--ink);font-size:16px}
+textarea{min-height:90px}
+.hint{font-size:12px;color:var(--muted)}
+.btnbar{display:flex;gap:8px;flex-wrap:wrap}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}
+.viewonly{margin:0 0 8px 0;padding:8px 10px;border-radius:10px;background:#12202e;border:1px solid #24384d;color:#cbe2ff;font-size:12px}
+
+/* ===== ツリー（親ユニット＝夫婦/片親をまとめる横レイアウト） ===== */
+.tree{padding:6px}
+.g{display:flex;flex-direction:column;align-items:center;gap:8px;margin:10px 0}
+.node{background:linear-gradient(180deg,#1b2230,#151a26);border:1px solid #313949;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.node .n{font-weight:800;font-size:17px}
+.pill,.chip{font-size:11px;border:1px solid #2c3650;background:#0f1322;border-radius:999px;padding:4px 8px;color:#b8c2dd;margin-right:6px}
+.unit{display:flex;align-items:center;gap:0}
+.unit .sp{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer}
+.unit .sp:active{opacity:.85}
+.unit .sep{width:28px;height:2px;background:var(--wire);border-radius:2px}
+.children{display:flex;gap:24px;align-items:flex-start;position:relative}
+.children::before{content:"";position:absolute;left:0;right:0;top:-8px;height:2.5px;background:var(--wire)}
+.linkDown{width:2px;height:16px;background:var(--wire)}
+.childWrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.centerLine{height:2.5px;background:var(--wire);border-radius:2px;margin:10px auto;width:90%}
+</style>
+</head><body>
+<header>
+  <h1>スマホ用ファミリーツリー</h1>
+  <div class="sub">人物を追加 → ツリーをタップでプロフィール表示。?shared=1 で共有表示（閲覧専用）。</div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" id="tabTree">ツリー</div>
+    <div class="tab" id="tabForm">人物を追加 / 編集</div>
+    <div class="tab" id="tabData">データ管理</div>
+  </div>
+
+  <section class="card" id="viewTree">
+    <div class="btnbar"><button class="btn ghost" id="btnScrollTop">先頭へ</button></div>
+    <div class="tree" id="tree"></div>
+  </section>
+
+  <section class="card" id="viewForm" style="display:none">
+    <div class="hint">IDと名前は必須。保存でツリー更新。</div>
+    <div class="row"><label>ID（英数字・一意）</label><input id="f_id" placeholder="例: daisuke"></div>
+    <div class="row"><label>名前</label><input id="f_name" placeholder="例: 小林 大資"></div>
+    <div class="row"><label>フリガナ</label><input id="f_furi" placeholder="例: コバヤシ ダイスケ"></div>
+    <div class="row"><label>生年月日</label><input id="f_birth" type="date"></div>
+    <div class="row"><label>好きなこと（, 区切り）</label><input id="f_likes"></div>
+    <div class="row"><label>アレルギー（, 区切り）</label><input id="f_allergies"></div>
+    <div class="row"><label>将来の抱負 / 一言</label><input id="f_goals"></div>
+    <div class="row"><label>メモ</label><textarea id="f_notes"></textarea></div>
+    <div class="row"><label>リンク1ラベル/URL</label><input id="f_link1_label" placeholder="LINE / 写真"><input id="f_link1_url" placeholder="https://..."></div>
+    <div class="row"><label>リンク2ラベル/URL</label><input id="f_link2_label" placeholder="任意"><input id="f_link2_url" placeholder="https://..."></div>
+    <div class="row"><label>親（1人目）</label><select id="f_parent1"></select></div>
+    <div class="row"><label>親（2人目・任意）</label><select id="f_parent2"></select></div>
+    <div class="row"><label>タグ（, 区切り）</label><input id="f_tags"></div>
+    <div class="btnbar">
+      <button class="btn" id="btnSave">保存する</button>
+      <button class="btn ghost" id="btnNew">新規にする</button>
+      <button class="btn danger" id="btnDelete">この人物を削除</button>
+    </div>
+  </section>
+
+  <section class="card" id="viewData" style="display:none">
+    <div class="btnbar">
+      <button class="btn alt" id="btnExport">JSONを書き出す</button>
+      <label class="btn ghost" for="fileImport">JSONを読み込む</label>
+      <input id="fileImport" type="file" accept="application/json" style="display:none">
+      <button class="btn danger" id="btnReset">初期データに戻す</button>
+    </div>
+    <div class="hint">共有表示は、URL末尾に <b>?shared=1</b> を付ける。<br>同じ場所の <code>family_data.json</code> を読み込んで閲覧専用になります。</div>
+  </section>
+</div>
+
+<dialog id="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--line)">
+    <div style="display:flex;gap:8px;align-items:center"><span class="pill">プロフィール</span><strong id="c_name"></strong><span class="chip" id="c_furi"></span></div>
+    <button class="btn ghost" id="c_close">閉じる</button>
+  </div>
+  <div style="padding:12px">
+    <div class="row"><label>【名前】</label><div id="v_name"></div></div>
+    <div class="row"><label>【フリガナ】</label><div id="v_furigana"></div></div>
+    <div class="row"><label>【生年月日 🎂】</label><div id="v_birth"></div></div>
+    <div class="row"><label>【現在の年齢 🎉】</label><div id="v_age"></div></div>
+    <div class="row"><label>【兄弟・姉妹】</label><div id="v_siblings"></div></div>
+    <div class="row"><label>【パパ・ママ】</label><div id="v_parents"></div></div>
+    <div class="row"><label>【好きなこと 🧡】</label><div id="v_likes"></div></div>
+    <div class="row"><label>【アレルギー 🤧】</label><div id="v_allergies"></div></div>
+    <div class="row"><label>【将来の抱負 🍀】</label><div id="v_goals"></div></div>
+    <div class="row"><label>【その他】</label><div id="v_notes"></div></div>
+    <div class="row"><label>🔗 リンク</label><div id="v_links" class="children"></div></div>
+    <div class="row"><label>タグ</label><div id="v_tags" class="children"></div></div>
+    <div class="btnbar"><button class="btn" id="btnEditFromCard">この人を編集する</button><span class="mono">ID: <span id="v_id"></span></span></div>
+  </div>
+</dialog>
+
+<script>
+// ========== ユーティリティ ==========
+const LSKEY="familyDataV1";
+const q=id=>document.getElementById(id);
+function saveLocal(arr){ try{ localStorage.setItem(LSKEY, JSON.stringify(arr)); }catch(e){} }
+function loadLocal(){ try{ const raw=localStorage.getItem(LSKEY); if(!raw) return null; const arr=JSON.parse(raw); return Array.isArray(arr)?arr:null; }catch(e){return null;} }
+function byId(arr){ return Object.fromEntries((arr||[]).filter(p=>p&&p.id).map(p=>[p.id,p])); }
+function fmtDate(s){ if(!s) return ""; const d=new Date(s); if(isNaN(d)) return s; const y=d.getFullYear(),m=("0"+(d.getMonth()+1)).slice(-2),dd=("0"+d.getDate()).slice(-2); return `${y}/${m}/${dd}`; }
+function ageStr(b){ if(!b) return ""; const T=new Date(); const d=new Date(b); if(isNaN(d)) return ""; let y=T.getFullYear()-d.getFullYear(); const before=(T.getMonth()<d.getMonth())||(T.getMonth()==d.getMonth()&&T.getDate()<d.getDate()); if(before) y--; const days=Math.floor((T-d)/86400000); return `${y}歳（生後${days}日）`; }
+
+// 共有読込（?shared=1 / ?src=URL）
+const MODE={readOnly:false,source:"local"};
+function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name); }
+async function tryLoadRemote(){
+  const srcParam=getParam('src'); const shared=getParam('shared');
+  const src=srcParam || (shared ? 'family_data.json' : '');
+  if(!src) return false;
+  try{
+    const res=await fetch(src,{cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status);
+    const arr=await res.json();
+    if(Array.isArray(arr)){ data=arr; MODE.readOnly=true; MODE.source=srcParam?'url':'same-folder'; return true; }
+    else throw new Error('JSONの形式が配列ではありません');
+  }catch(e){ alert('共有データの読み込みに失敗しました：'+(e?.message||e)); return false; }
+}
+function applyReadOnlyUI(){
+  if(!MODE.readOnly) return;
+  const note=document.createElement('div');
+  note.className='viewonly'; note.textContent='これは共有ビューです（閲覧専用）。編集は各自の端末で行ってください。';
+  q('viewTree').prepend(note);
+  q('tabForm').style.display='none';
+  q('tabData').style.display='none';
+}
+
+// ===== 初期データ =====
+const initial=[{"id":"daisuke","name":"小林 大資","furigana":"コバヤシ ダイスケ","birth":"1998-08-12","likes":["夏の夜","BUMP OF CHICKEN","考え事","絵を描くこと"],"allergies":["犬","チョコ","梅干し","納豆"],"notes":"似顔絵描けます / AI勉強中","links":[{"label":"LINE","url":"https://line.me/R/ti/p/xxxxxxxx"}],"parents":["toru","tomoko"],"tags":["198系"]},{"id":"toru","name":"小林 徹","furigana":"コバヤシ トオル","tags":["父"]},{"id":"tomoko","name":"小林 知子","furigana":"コバヤシ トモコ","tags":["母"]},{"id":"yuta","name":"小林 優太","furigana":"コバヤシ ユウタ","tags":["パパ"]},{"id":"mai","name":"舞","furigana":"マイ","tags":["ママ"]},{"id":"sonoka","name":"想果","furigana":"ソノカ","birth":"2020-09-16","parents":["yuta","mai"],"tags":["長女"]},{"id":"yume","name":"夢乃","furigana":"ユメノ","birth":"2023-08-15","parents":["yuta","mai"],"tags":["次女"]},{"id":"ritto","name":"小林 律翔","furigana":"こばやし りつと","birth":"2025-08-04","likes":["寝ること💤"],"allergies":["生物","お肉","ハチミツ"],"goals":"自習館にお受験すること","parents":["yuta","mai"],"tags":["長男"]}];
+
+// ===== 状態＆タブ =====
+let data=loadLocal()||initial.slice();
+let editingId="";
+const tabTree=q('tabTree'), tabForm=q('tabForm'), tabData=q('tabData');
+const viewTree=q('viewTree'), viewForm=q('viewForm'), viewData=q('viewData');
+function setTab(which){
+  [tabTree,tabForm,tabData].forEach(t=>t.classList.remove('active'));
+  [viewTree,viewForm,viewData].forEach(v=>v.style.display='none');
+  if(which==='tree'){ tabTree.classList.add('active'); viewTree.style.display='block'; }
+  if(which==='form'){ tabForm.classList.add('active'); viewForm.style.display='block'; }
+  if(which==='data'){ tabData.classList.add('active'); viewData.style.display='block'; }
+  scrollTo({top:0,behavior:'smooth'});
+}
+tabTree.onclick=()=>setTab('tree');
+tabForm.onclick=()=>{ refreshParents(); setTab('form'); };
+tabData.onclick=()=>setTab('data');
+q('btnScrollTop').onclick=()=>scrollTo({top:0,behavior:'smooth'});
+
+// ===== フォーム =====
+const f={ id:q('f_id'), name:q('f_name'), furi:q('f_furi'), birth:q('f_birth'),
+  likes:q('f_likes'), allergies:q('f_allergies'), goals:q('f_goals'), notes:q('f_notes'),
+  link1_label:q('f_link1_label'), link1_url:q('f_link1_url'),
+  link2_label:q('f_link2_label'), link2_url:q('f_link2_url'),
+  p1:q('f_parent1'), p2:q('f_parent2'), tags:q('f_tags')
+};
+function refreshParents(){
+  [f.p1,f.p2].forEach(sel=>sel.innerHTML='');
+  const opt=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;return o;};
+  const byName=data.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'ja'));
+  [f.p1,f.p2].forEach(sel=>sel.appendChild(opt('','（指定しない）')));
+  byName.forEach(p=>[f.p1,f.p2].forEach(sel=>sel.appendChild(opt(p.id,`${p.name}（${p.id}）`))));
+}
+function fillForm(p){
+  editingId=p.id||"";
+  const toCSV=a=>Array.isArray(a)?a.join(", "):(a||"");
+  f.id.value=p.id||""; f.name.value=p.name||""; f.furi.value=p.furigana||"";
+  f.birth.value=p.birth||""; f.likes.value=toCSV(p.likes); f.allergies.value=toCSV(p.allergies);
+  f.goals.value=p.goals||""; f.notes.value=p.notes||"";
+  f.link1_label.value=p.links?.[0]?.label||""; f.link1_url.value=p.links?.[0]?.url||"";
+  f.link2_label.value=p.links?.[1]?.label||""; f.link2_url.value=p.links?.[1]?.url||"";
+  refreshParents(); f.p1.value=p.parents?.[0]||""; f.p2.value=p.parents?.[1]||"";
+  f.tags.value=toCSV(p.tags);
+}
+function formToObj(){
+  const split=s=>s?s.split(",").map(s=>s.trim()).filter(Boolean):[];
+  const links=[]; if(f.link1_label.value||f.link1_url.value) links.push({label:f.link1_label.value,url:f.link1_url.value});
+  if(f.link2_label.value||f.link2_url.value) links.push({label:f.link2_label.value,url:f.link2_url.value});
+  const parents=[f.p1.value,f.p2.value].filter(Boolean);
+  return { id:f.id.value.trim(), name:f.name.value.trim(), furigana:f.furi.value.trim(), birth:f.birth.value||undefined,
+    likes:split(f.likes.value), allergies:split(f.allergies.value), goals:f.goals.value.trim(), notes:f.notes.value,
+    links, parents, tags:split(f.tags.value) };
+}
+q('btnSave').onclick=()=>{
+  const obj=formToObj(); if(!obj.id){alert('IDは必須です');return;} if(!obj.name){alert('名前は必須です');return;}
+  const oldId=editingId||""; const newId=obj.id;
+  const idxOld=data.findIndex(p=>p.id===oldId); const isRename=oldId&&oldId!==newId&&idxOld>=0;
+  if(isRename){
+    data.splice(idxOld,1); data.push(obj);
+    // 参照置換
+    data.forEach(p=>{ if(Array.isArray(p.parents)) p.parents=p.parents.map(pid=>pid===oldId?newId:pid); });
+  }else{
+    const idx=data.findIndex(p=>p.id===newId); if(idx>=0) data[idx]=obj; else data.push(obj);
+  }
+  saveLocal(data); buildTree(); alert('保存しました！'); setTab('tree'); editingId=newId;
+};
+q('btnNew').onclick=()=>{editingId=""; fillForm({});};
+q('btnDelete').onclick=()=>{
+  const id=f.id.value.trim(); if(!id){alert('削除するIDが未入力です');return;}
+  if(!confirm(`ID「${id}」を削除しますか？`)) return;
+  data=data.filter(p=>p.id!==id); saveLocal(data); buildTree(); alert('削除しました'); fillForm({}); setTab('tree');
+};
+
+// ===== 親ユニット構築（夫婦 or 片親）＆描画 =====
+const drawnPeople=new Set();   // 描いた個人ID
+const drawnUnits =new Set();   // 描いたユニットキー
+
+// ユニットキー生成：親2人なら "a|b"（IDソート済み）／片親なら "a|-"
+function unitKeyFromParents(parents){
+  const ps=(parents||[]).filter(Boolean);
+  if(ps.length>=2){ const pair=ps.slice(0,2).sort(); return pair[0]+'|'+pair[1]; }
+  if(ps.length===1){ return ps[0]+'|-'; }
+  return null;
+}
+
+function wireDown(){ const v=document.createElement('div'); v.className='linkDown'; return v; }
+
+function personBox(p){
+  const box=document.createElement('div'); box.className='node person';
+  box.innerHTML=`<span class="pill">${p.furigana||'—'}</span><span class="n">${p.name||'(無名)'}</span>${p.birth?`<span class="chip">${fmtDate(p.birth)}</span>`:(p.tags?.[0]?`<span class="chip">${p.tags[0]}</span>`:"")}`;
+  box.onclick=()=>openCard(p); return box;
+}
+function renderPerson(id){
+  if(drawnPeople.has(id)) return document.createElement('span');
+  const p=byId(data)[id]; const g=document.createElement('div'); g.className='g';
+  g.appendChild(personBox(p)); drawnPeople.add(id); return g;
+}
+
+function renderUnit(key, maps){
+  if(drawnUnits.has(key)) return document.createElement('span');
+  drawnUnits.add(key);
+
+  const {people, unitKids, personToUnit} = maps;
+  const g=document.createElement('div'); g.className='g';
+  const box=document.createElement('div'); box.className='node unit';
+
+  const [aId,bId]=key.split('|'); // bId は "−" の場合あり（片親）
+  const A=people[aId]; const B=bId==='-'?null:people[bId];
+
+  const left=document.createElement('div'); left.className='sp';
+  left.innerHTML=`<span class="pill">${A?.furigana||'—'}</span><span class="n">${A?.name||'(無名)'}</span>`;
+  left.setAttribute('role','button'); left.onclick=(ev)=>{ev.stopPropagation(); openCard(A);};
+  box.appendChild(left);
+
+  const mid=document.createElement('div'); mid.className='sep'; box.appendChild(mid);
+
+  if(B){ // 夫婦
+    const right=document.createElement('div'); right.className='sp';
+    right.innerHTML=`<span class="pill">${B.furigana||'—'}</span><span class="n">${B.name||'(無名)'}</span>`;
+    right.setAttribute('role','button'); right.onclick=(ev)=>{ev.stopPropagation(); openCard(B);};
+    box.appendChild(right);
+  }else{ // 片親表示（右側はダミー）
+    const right=document.createElement('div'); right.className='sp'; right.style.opacity=.25;
+    right.innerHTML=`<span class="pill">（片親）</span><span class="n">—</span>`;
+    box.appendChild(right);
+  }
+
+  g.appendChild(box);
+
+  const kids=(unitKids[key]||[]).slice().sort((x,y)=>{
+    const bx=people[x]?.birth?new Date(people[x].birth).getTime():Infinity;
+    const by=people[y]?.birth?new Date(people[y].birth).getTime():Infinity; return bx-by;
+  });
+
+  if(kids.length){
+    g.appendChild(wireDown());
+    const row=document.createElement('div'); row.className='children';
+    kids.forEach(cid=>{
+      const wrap=document.createElement('div'); wrap.className='childWrap';
+      const ck=personToUnit[cid];
+      if(ck && ck!==key && !drawnUnits.has(ck)){ wrap.appendChild(renderUnit(ck, maps)); }
+      else{ if(!drawnPeople.has(cid)) wrap.appendChild(renderPerson(cid)); }
+      row.appendChild(wrap);
+    });
+    g.appendChild(row);
+  }
+  return g;
+}
+
+function buildTree(){
+  // 毎回リセット（constのまま .clear()）
+  drawnPeople.clear(); drawnUnits.clear();
+
+  const people = byId(data);
+
+  // 1) 子→親からユニット集合と子リストを作成
+  const unitKids={};                  // key -> [childIds]
+  const personToUnit={};              // parentId -> unitKey（その人が属する親ユニット）
+  const isChild=new Set();            // 親を持つ人
+  const inAnyUnit=new Set();          // 親としてユニットに参加している人
+
+  data.forEach(p=>{
+    const key=unitKeyFromParents(p.parents);
+    if(key){ // この人は子としてユニット key にぶら下がる
+      (unitKids[key] ||= []).push(p.id);
+      isChild.add(p.id);
+      // 親側をユニットに登録
+      const [a,b]=key.split('|');
+      if(a && a!=='-'){ personToUnit[a]=personToUnit[a]||key; inAnyUnit.add(a); }
+      if(b && b!=='-'){ personToUnit[b]=personToUnit[b]||key; inAnyUnit.add(b); }
+    }
+  });
+
+  // 2) ルート決定
+  //   ルート親ユニット：親2人（または片親）どちらも「子として登録されていない」
+  const rootUnits=[];
+  Object.keys(unitKids).forEach(key=>{
+    const [a,b]=key.split('|');
+    const aIsRoot = !isChild.has(a);
+    const bIsRoot = (b==='-') ? true : !isChild.has(b);
+    if(aIsRoot && bIsRoot) rootUnits.push(key);
+  });
+
+  //   ルート単独：親を持たず、かつ親ユニットにも入っていない人
+  const rootSingles=data.filter(p=>{
+    const noParents=!(p.parents&&p.parents.length);
+    return noParents && !inAnyUnit.has(p.id);
+  }).map(p=>p.id);
+
+  // 3) 描画
+  const tree=q('tree'); tree.innerHTML="";
+  const row=document.createElement('div'); row.className='children'; row.style.marginTop='12px';
+  const wrap=document.createElement('div'); wrap.className='childWrap';
+
+  rootUnits.forEach(k=>{
+    const w=document.createElement('div'); w.className='childWrap';
+    w.appendChild(renderUnit(k,{people,unitKids,personToUnit}));
+    wrap.appendChild(w);
+  });
+  rootSingles.forEach(id=>{
+    const w=document.createElement('div'); w.className='childWrap';
+    w.appendChild(renderPerson(id));
+    wrap.appendChild(w);
+  });
+
+  row.appendChild(wrap);
+  tree.appendChild(row);
+  refreshParents();
+}
+
+// ===== カード =====
+const dlg=q('card'); q('c_close').onclick=()=>dlg.close();
+q('btnEditFromCard').onclick=()=>{ const id=q('v_id').textContent; const p=data.find(x=>x.id===id); if(p){ fillForm(p); setTab('form'); dlg.close(); } };
+function openCard(p){
+  const T=(id,v)=>q(id).textContent=v||"";
+  T('c_name',p.name); T('c_furi',p.furigana); T('v_id',p.id);
+  T('v_name',p.name); T('v_furigana',p.furigana);
+  T('v_birth',p.birth?fmtDate(p.birth):""); T('v_age',p.birth?ageStr(p.birth):"");
+  const names=(p.parents||[]).map(pid=> (data.find(x=>x.id===pid)||{}).name).filter(Boolean);
+  T('v_parents',names.join("・"));
+const myParents = new Set((p.parents||[]).filter(Boolean));
+let sib = [];
+if (myParents.size > 0) {
+  sib = data.filter(x=>{
+    if (x.id === p.id) return false;                 // 自分は除外
+    const xp = new Set((x.parents||[]).filter(Boolean));
+    if (xp.size === 0) return false;                 // 親なしは兄弟にしない
+    // 親のどれかが一致すれば兄弟扱い（片親OK）
+    let share = false;
+    for (const id of xp) if (myParents.has(id)) { share = true; break; }
+    // 自分の親そのものは兄弟にしない
+    const isMyParent = myParents.has(x.id);
+    return share && !isMyParent;
+  }).sort((a,b)=>{
+    const ta = a.birth ? new Date(a.birth).getTime() : Infinity;
+    const tb = b.birth ? new Date(b.birth).getTime() : Infinity;
+    return ta - tb;
+  }).map(x=>x.name + (x.birth?`（${fmtDate(x.birth)}）`:""));
+}
+  T('v_siblings',sib.join("、"));
+  const likes=Array.isArray(p.likes)?p.likes.join("、"):(p.likes||"");
+  const allergies=Array.isArray(p.allergies)?p.allergies.join("、"):(p.allergies||"");
+  T('v_likes',likes); T('v_allergies',allergies);
+  T('v_goals',p.goals||""); T('v_notes',p.notes||"");
+  const lw=q('v_links'); lw.innerHTML="";
+  (p.links||[]).forEach(l=>{ if(!l?.url) return; const a=document.createElement('a'); a.href=l.url; a.target="_blank"; a.rel="noopener"; a.className='chip'; a.textContent=l.label||"リンク"; lw.appendChild(a); });
+  const tw=q('v_tags'); tw.innerHTML=""; (p.tags||[]).forEach(t=>{ const s=document.createElement('span'); s.className='chip'; s.textContent=t; tw.appendChild(s); });
+  dlg.showModal();
+}
+
+// ===== Export / Import / Reset =====
+q('btnExport').onclick=async()=>{
+  try{
+    const json=JSON.stringify(data,null,2);
+    const blob=new Blob([json],{type:"application/json"});
+    const fileName="family_data.json";
+    const shareFile=new File([blob],fileName,{type:"application/json"});
+    const canShare=!!(navigator.canShare && navigator.canShare({files:[shareFile]}));
+    if(canShare && navigator.share){
+      await navigator.share({files:[shareFile],title:"Family data",text:"『ファイルに保存』を選んで保存してください。"});
+      alert("共有メニューを開きました。『ファイルに保存』で保存先を選んでください。");
+    }else{
+      const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      alert("ダウンロードを開始しました。『ファイル』アプリの“ダウンロード”に保存されます。");
+    }
+  }catch(e){ alert("書き出しエラー: "+(e?.message||e)); }
+};
+q('fileImport').onchange=(ev)=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{ const arr=JSON.parse(reader.result); if(!Array.isArray(arr)) throw new Error("配列データではありません");
+      data=arr; saveLocal(data); buildTree(); alert("読み込みました");
+    }catch(err){ alert("読み込みエラー: "+err.message); }
+  };
+  reader.readAsText(f);
+};
+q('btnReset').onclick=()=>{ if(!confirm("初期データに戻しますか？（端末の保存データは消えます）")) return; data=initial.slice(); saveLocal(data); buildTree(); alert("初期化しました"); };
+
+// ===== Boot =====
+(async()=>{
+  try{ await tryLoadRemote(); }catch(e){ alert('初期化エラー: '+(e?.message||e)); }
+  try{ buildTree(); }catch(e){ alert('描画エラー: '+(e?.message||e)); q('tree').innerHTML=''; }
+  refreshParents(); applyReadOnlyUI();
+})();
+</script>
+</body></html>
